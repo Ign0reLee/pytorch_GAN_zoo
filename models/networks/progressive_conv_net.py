@@ -158,7 +158,8 @@ class GNet(nn.Module):
         self.alpha = alpha
 
     def forward(self, x):
-
+        # For First Input
+        scale = None 
         ## Normalize the input ?
         if self.normalizationLayer is not None:
             x = self.normalizationLayer(x)
@@ -191,7 +192,9 @@ class GNet(nn.Module):
         # Last Calculate Part.
         # Finally we passing inputs to last layer
         # if scale0, first passing this step
-        x = Upscale2d(x)
+        # then, scale is None
+        if scale is not None:
+            x = Upscale2d(x)
         for convLayer in layerGroup[-1]:
             x = self.leakyRelu(convLayer(x))
             if self.normalizationLayer is not None:
