@@ -177,8 +177,8 @@ class GNet(nn.Module):
         # I don't know Why distributed moduleist scale 0 and others.
         # I think if len(sclaLayer) == 1 (Scale 0), skip this step.
         for layerGroup in self.scaleLayers[:-1]:
-            for convLayer in layerGroup:
-                x = self.leakyRelu(convLayer(x))
+            for Layer in layerGroup:
+                x = self.leakyRelu(Layer(x))
                 if self.normalizationLayer is not None:
                     x = self.normalizationLayer(x)
 
@@ -194,8 +194,8 @@ class GNet(nn.Module):
         # Finally we passing inputs to last layer
         # if scale0, first passing this step
         # then, scale is None
-        for convLayer in layerGroup[-1]:
-            x = self.leakyRelu(convLayer(x))
+        for Layer in self.scaleLayers[-1]:
+            x = self.leakyRelu(Layer(x))
             if self.normalizationLayer is not None:
                 x = self.normalizationLayer(x)
 
