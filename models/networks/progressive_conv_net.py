@@ -162,8 +162,7 @@ class GNet(nn.Module):
         self.alpha = alpha
 
     def forward(self, x):
-        # For First Input
-        scale = None 
+
         ## Normalize the input ?
         if self.normalizationLayer is not None:
             x = self.normalizationLayer(x)
