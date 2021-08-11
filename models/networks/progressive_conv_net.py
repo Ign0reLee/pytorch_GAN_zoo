@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .custom_layers import EqualizedConv2d, EqualizedLinear,\
-    NormalizationLayer, Upscale2d
+    NormalizationLayer, Upscale2d, Upscale2dLayer
 from ..utils.utils import num_flat_features
 from.mini_batch_stddev_module import miniBatchStdDev
 
@@ -120,7 +120,11 @@ class GNet(nn.Module):
 
         self.scalesDepth.append(depthNewScale)
 
+        # if we upscale like this
+        # we don't need to worry about upscaling
         self.scaleLayers.append(nn.ModuleList())
+
+        self.scaleLayers[-1].append(Upscale2dLayer())
 
         self.scaleLayers[-1].append(EqualizedConv2d(depthLastScale,
                                                     depthNewScale,
@@ -173,17 +177,15 @@ class GNet(nn.Module):
         # Before Forwarding Part.
         # I don't know Why distributed moduleist scale 0 and others.
         # I think if len(sclaLayer) == 1 (Scale 0), skip this step.
-        for scale, layerGroup in enumerate(self.scaleLayers[:-1], 0):
-            if not scale is 0:
-                x = Upscale2d(x)
+        for layerGroup in self.scaleLayers[:-1]:
             for convLayer in layerGroup:
                 x = self.leakyRelu(convLayer(x))
                 if self.normalizationLayer is not None:
                     x = self.normalizationLayer(x)
 
-        # By Default. if alpha > 0 it means len(toRGBLayers) == 2.
+        # By Default. if alpha > 0 it means len(toRGBLayers) >= 2.
         # And Scale >= 1.
-        # In this step. we calculated before last layer
+        # In this step. we calculated before the last layer
         # so we do not need to check what scale it is
         if self.alpha > 0:
             y = self.toRGBLayers[-2](x)
@@ -193,8 +195,6 @@ class GNet(nn.Module):
         # Finally we passing inputs to last layer
         # if scale0, first passing this step
         # then, scale is None
-        if scale is not None:
-            x = Upscale2d(x)
         for convLayer in layerGroup[-1]:
             x = self.leakyRelu(convLayer(x))
             if self.normalizationLayer is not None:

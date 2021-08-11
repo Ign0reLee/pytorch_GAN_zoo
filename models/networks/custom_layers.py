@@ -14,6 +14,24 @@ class NormalizationLayer(nn.Module):
     def forward(self, x, epsilon=1e-8):
         return x * (((x**2).mean(dim=1, keepdim=True) + epsilon).rsqrt())
 
+class Upscale2dLayer(nn.Module):
+    r"""
+    Same as below code.
+    but, if make this, we can add modulelist using append.
+    this is helpful some cases.
+    """
+    def __init__(self):
+        super(Upscale2dLayer, self).__init__()
+        
+    def forward(self, x, factor=2):
+        assert isinstance(factor, int) and factor >= 1
+        if factor == 1:
+            return x
+        s = x.size()
+        x = x.view(-1, s[1], s[2], 1, s[3], 1)
+        x = x.expand(-1, s[1], s[2], factor, s[3], factor)
+        x = x.contiguous().view(-1, s[1], s[2] * factor, s[3] * factor)
+        return x
 
 def Upscale2d(x, factor=2):
     assert isinstance(factor, int) and factor >= 1
