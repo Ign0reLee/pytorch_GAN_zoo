@@ -51,24 +51,6 @@ class GNet(nn.Module):
         self.scaleLayers = nn.ModuleList()
         self.toRGBLayers = nn.ModuleList()
 
-        # Initialize the scale 0
-        self.initFormatLayer(dimLatent)
-        self.dimOutput = dimOutput
-        self.scaleLayers.append(nn.ModuleList())
-        self.scaleLayers[-1].append(EqualizedConv2d(depthScale0, depthScale0, 3,
-                                                equalized=equalizedlR,
-                                                initBiasToZero=initBiasToZero,
-                                                padding=1))
-        # self.groupScale0 = nn.ModuleList()
-        # self.groupScale0.append(EqualizedConv2d(depthScale0, depthScale0, 3,
-        #                                         equalized=equalizedlR,
-        #                                         initBiasToZero=initBiasToZero,
-        #                                         padding=1))
-
-        self.toRGBLayers.append(EqualizedConv2d(depthScale0, self.dimOutput, 1,
-                                                equalized=equalizedlR,
-                                                initBiasToZero=initBiasToZero))
-
         # Initalize the upscaling parameters
         # alpha : when a new scale is added to the network, the previous
         # layer is smoothly merged with the output in the first stages of
@@ -86,6 +68,25 @@ class GNet(nn.Module):
         # Last layer activation function
         self.generationActivation = generationActivation
         self.depthScale0 = depthScale0
+
+        # Initialize the scale 0
+        self.initFormatLayer(dimLatent)
+        self.dimOutput = dimOutput
+        self.scaleLayers.append(nn.ModuleList())
+        self.scaleLayers[-1].append(EqualizedConv2d(depthScale0, depthScale0, 3,
+                                                equalized=equalizedlR,
+                                                initBiasToZero=initBiasToZero,
+                                                padding=1))
+        self.scaleLayers[-1].append(self.leakyRelu)
+        if self.normalizationLayer is not None:
+            self.scaleLayers[-1].append(self.normalizationLayer)
+        
+
+        self.toRGBLayers.append(EqualizedConv2d(depthScale0, self.dimOutput, 1,
+                                                equalized=equalizedlR,
+                                                initBiasToZero=initBiasToZero))
+
+        
 
 
     def initFormatLayer(self, dimLatentVector):
@@ -132,10 +133,17 @@ class GNet(nn.Module):
                                                     padding=1,
                                                     equalized=self.equalizedlR,
                                                     initBiasToZero=self.initBiasToZero))
+        self.scaleLayers[-1].append(self.leakyRelu)
+        if self.normalizationLayer is not None:
+            self.scaleLayers[-1].append(self.normalizationLayer)
+
         self.scaleLayers[-1].append(EqualizedConv2d(depthNewScale, depthNewScale,
                                                     3, padding=1,
                                                     equalized=self.equalizedlR,
                                                     initBiasToZero=self.initBiasToZero))
+        self.scaleLayers[-1].append(self.leakyRelu)
+        if self.normalizationLayer is not None:
+            self.scaleLayers[-1].append(self.normalizationLayer)
 
         self.toRGBLayers.append(EqualizedConv2d(depthNewScale,
                                                 self.dimOutput,
@@ -178,9 +186,7 @@ class GNet(nn.Module):
         # I think if len(sclaLayer) == 1 (Scale 0), skip this step.
         for layerGroup in self.scaleLayers[:-1]:
             for Layer in layerGroup:
-                x = self.leakyRelu(Layer(x))
-                if self.normalizationLayer is not None:
-                    x = self.normalizationLayer(x)
+                x = Layer(x)
 
         # By Default. if alpha > 0 it means len(toRGBLayers) >= 2.
         # And Scale >= 1.
@@ -195,33 +201,7 @@ class GNet(nn.Module):
         # if scale0, first passing this step
         # then, scale is None
         for Layer in self.scaleLayers[-1]:
-            x = self.leakyRelu(Layer(x))
-            if self.normalizationLayer is not None:
-                x = self.normalizationLayer(x)
-
-        # # Scale 0 (no upsampling)
-        # for convLayer in self.groupScale0:
-        #     x = self.leakyRelu(convLayer(x))
-        #     if self.normalizationLayer is not None:
-        #         x = self.normalizationLayer(x)
-
-        # # Dirty, find a better way
-        # if self.alpha > 0 and len(self.scaleLayers) == 1:
-        #     y = self.toRGBLayers[-2](x)
-        #     y = Upscale2d(y)
-
-        # # Upper scales
-        # for scale, layerGroup in enumerate(self.scaleLayers, 0):
-
-        #     x = Upscale2d(x)
-        #     for convLayer in layerGroup:
-        #         x = self.leakyRelu(convLayer(x))
-        #         if self.normalizationLayer is not None:
-        #             x = self.normalizationLayer(x)
-
-        #     if self.alpha > 0 and scale == (len(self.scaleLayers) - 2):
-        #         y = self.toRGBLayers[-2](x)
-        #         y = Upscale2d(y)
+            x = Layer(x)
 
         # To RGB (no alpha parameter for now)
         x = self.toRGBLayers[-1](x)
